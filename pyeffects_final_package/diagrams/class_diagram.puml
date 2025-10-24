@@ -1,0 +1,190 @@
+@startuml pyeffects_class_diagram
+
+!define ABSTRACT_CLASS abstract class
+!define INTERFACE interface
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 11
+skinparam packageStyle rectangle
+
+title pyeffects - Class Diagram
+
+package "pyeffects.Monad" {
+    abstract class Monad<A> {
+        # value: A
+        # biased: bool
+        --
+        + {static} of(x: B): Monad[B]
+        + {abstract} flat_map(f: Callable[[A], Monad[B]]): Monad[B]
+        + map(func: Callable[[A], B]): Monad[B]
+        + foreach(func: Callable[[A], B]): None
+        + get(): A
+        + get_or_else(v: A): A
+        + or_else_supply(func: Callable[[], A]): A
+        + or_else(other: Monad[A]): Monad[A]
+    }
+}
+
+package "pyeffects.Option" {
+    abstract class Option<A> {
+        + {static} of(value: B): Option[B]
+        + flat_map(func: Callable[[A], Monad[B]]): Monad[B]
+        + is_defined(): bool
+        + is_empty(): bool
+        + __eq__(other: object): bool
+    }
+    
+    class Some<A> {
+        + value: A
+        + biased: bool = True
+        --
+        + __init__(value: A): None
+        + __str__(): str
+        + __repr__(): str
+    }
+    
+    class Empty<A> {
+        + value: None
+        + biased: bool = False
+        --
+        + __init__(): None
+        + __str__(): str
+        + __repr__(): str
+    }
+    
+    note right of Empty
+        Singleton instance:
+        empty = Empty()
+    end note
+}
+
+package "pyeffects.Either" {
+    abstract class Either<A> {
+        + {static} of(value: B): Either[B]
+        + flat_map(func: Callable[[A], Monad[B]]): Monad[B]
+        + is_right(): bool
+        + is_left(): bool
+        + __eq__(other: object): bool
+    }
+    
+    class Left<A> {
+        + value: A
+        + biased: bool = False
+        --
+        + __init__(value: A): None
+        + left(): A
+        + __str__(): str
+        + __repr__(): str
+    }
+    
+    class Right<A> {
+        + value: A
+        + biased: bool = True
+        --
+        + __init__(value: A): None
+        + right(): A
+        + __str__(): str
+        + __repr__(): str
+    }
+}
+
+package "pyeffects.Try" {
+    abstract class Try<A> {
+        + {static} of(func_or_value: Union[B, Callable[[], B]]): Try[B]
+        + flat_map(func: Callable[[A], Monad[B]]): Monad[B]
+        + recover(err: Type[Exception], recover: Union[B, Callable[[], B]]): Try[B]
+        + recovers(errs: List[Type[Exception]], recover: Union[B, Callable[[], B]]): Try[B]
+        + error(): Exception
+        + is_success(): bool
+        + is_failure(): bool
+        + on_success(func: Callable[[A], None]): None
+        + on_failure(func: Callable[[Exception], None]): None
+        + __eq__(other: object): bool
+    }
+    
+    class Success<A> {
+        + value: A
+        + biased: bool = True
+        --
+        + __init__(value: A): None
+        + __str__(): str
+        + __repr__(): str
+    }
+    
+    class Failure<A> {
+        + value: Exception
+        + biased: bool = False
+        --
+        + __init__(value: Exception): None
+        + __str__(): str
+        + __repr__(): str
+    }
+}
+
+package "pyeffects.Future" {
+    class Future<A> {
+        + subscribers: List[Callable[[A], None]]
+        - cache: Option[Try[A]]
+        - semaphore: BoundedSemaphore
+        + biased: bool = True
+        + value: Try[A]
+        --
+        + __init__(func: Callable): None
+        + {static} of(value: B): Future[B]
+        + {static} run(func: Callable[[], A]): Future[A]
+        + {static} traverse(arr: List[Future]): Future[List]
+        + flat_map(func: Callable[[A], Monad[B]]): Monad[B]
+        + get(): A
+        + error(): Exception
+        + is_done(): bool
+        + is_success(): bool
+        + is_failure(): bool
+        + on_complete(subscriber: Callable[[A], None]): None
+        + on_success(subscriber: Callable[[A], None]): None
+        + on_failure(subscriber: Callable[[Exception], None]): None
+        + __str__(): str
+        + __repr__(): str
+        --
+        - {static} _exec(func: Callable[[], A], cb: Callable[[Try[A]], None]): None
+        - {static} _run_on_thread(func: Callable[[], A], cb: Callable[[Try[A]], None]): None
+        - _callback(value: Try[A]): None
+    }
+}
+
+' Inheritance relationships
+Monad <|-- Option
+Monad <|-- Either
+Monad <|-- Try
+Monad <|-- Future
+
+Option <|-- Some
+Option <|-- Empty
+
+Either <|-- Left
+Either <|-- Right
+
+Try <|-- Success
+Try <|-- Failure
+
+' Composition relationships
+Future o-- Try : wraps result in
+Future o-- Option : uses for cache
+
+' Dependencies
+Future ..> Success : creates
+Future ..> Failure : creates
+
+note bottom of Monad
+    Base abstract class for all monadic types.
+    Implements map() using flat_map().
+    Uses 'biased' flag for polymorphic behavior.
+end note
+
+note bottom of Future
+    Asynchronous computation using threads.
+    Thread-safe using BoundedSemaphore.
+    Wraps results in Try monad.
+end note
+
+@enduml
+

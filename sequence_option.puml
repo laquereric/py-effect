@@ -1,0 +1,94 @@
+@startuml option_sequence
+
+title Option Monad - Sequence Diagram
+
+actor User
+participant "Option" as Opt
+participant "Some" as S
+participant "Empty" as E
+
+== Construction ==
+User -> Opt: Option.of(5)
+activate Opt
+Opt -> S: Some(5)
+activate S
+S --> Opt: Some instance
+deactivate S
+Opt --> User: Some(5)
+deactivate Opt
+
+User -> Opt: Option.of(None)
+activate Opt
+Opt -> E: empty (singleton)
+activate E
+E --> Opt: Empty instance
+deactivate E
+Opt --> User: Empty()
+deactivate Opt
+
+== Map Operation (Success Path) ==
+User -> S: Some(5).map(lambda v: v * v)
+activate S
+S -> S: flat_map(wrapped)
+activate S
+S -> S: is_defined() == True
+S -> S: func(5) -> 25
+S -> Opt: of(25)
+activate Opt
+Opt -> S: Some(25)
+activate S
+S --> Opt
+deactivate S
+Opt --> S
+deactivate Opt
+S --> S: Some(25)
+deactivate S
+S --> User: Some(25)
+deactivate S
+
+== Map Operation (Empty Path) ==
+User -> E: Empty().map(lambda v: v * v)
+activate E
+E -> E: flat_map(wrapped)
+activate E
+E -> E: is_defined() == False
+E --> E: empty
+deactivate E
+E --> User: Empty()
+deactivate E
+
+== Get Operations ==
+User -> S: Some(5).get()
+activate S
+S -> S: biased == True
+S --> User: 5
+deactivate S
+
+User -> E: Empty().get()
+activate E
+E -> E: biased == False
+E --> User: TypeError
+deactivate E
+
+User -> E: Empty().get_or_else(10)
+activate E
+E -> E: biased == False
+E --> User: 10
+deactivate E
+
+== Chaining Operations ==
+User -> S: Some(5).map(lambda v: v * 2).map(lambda v: v + 1)
+activate S
+S -> S: map(lambda v: v * 2)
+activate S
+S -> S: Some(10)
+deactivate S
+S -> S: map(lambda v: v + 1)
+activate S
+S -> S: Some(11)
+deactivate S
+S --> User: Some(11)
+deactivate S
+
+@enduml
+

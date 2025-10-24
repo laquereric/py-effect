@@ -1,0 +1,66 @@
+@startuml activity_composition
+
+title Monad Composition - Activity Diagram
+
+|User Code|
+start
+
+:Create initial monad;
+note right
+    e.g., Some(5)
+    or Try.of(lambda: get_data())
+end note
+
+:Apply map() transformation;
+
+|Monad Implementation|
+:Wrap function in monad constructor;
+note right
+    wrapped(x) = self.of(func(x))
+end note
+
+:Call flat_map(wrapped);
+
+if (is biased?) then (True)
+    :Extract value;
+    :Apply function to value;
+    :Get result;
+    
+    if (result is Monad?) then (Yes)
+        :Return result monad;
+    else (No)
+        :Wrap result in monad;
+        :Return wrapped monad;
+    endif
+else (False)
+    :Short-circuit;
+    :Return self unchanged;
+endif
+
+|User Code|
+:Receive transformed monad;
+
+if (Chain more operations?) then (Yes)
+    :Apply next transformation;
+    |Monad Implementation|
+    backward:Process next operation;
+else (No)
+    :Extract final value;
+    
+    if (Extract safely?) then (get_or_else)
+        :Provide default value;
+        :Return value or default;
+        stop
+    else (get)
+        if (is biased?) then (True)
+            :Return value;
+            stop
+        else (False)
+            :Raise TypeError;
+            stop
+        endif
+    endif
+endif
+
+@enduml
+

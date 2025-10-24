@@ -1,0 +1,81 @@
+@startuml try_state
+
+title Try Monad - State Diagram
+
+[*] --> Evaluating : Try.of(func_or_value)
+
+state Evaluating {
+    [*] --> CheckCallable
+    CheckCallable --> ExecuteFunction : is callable
+    CheckCallable --> WrapValue : not callable
+    
+    ExecuteFunction --> CatchException : execute
+    WrapValue --> CreateSuccess
+    
+    state CatchException {
+        [*] --> TryExecute
+        TryExecute --> CreateSuccess : no exception
+        TryExecute --> CreateFailure : exception thrown
+    }
+}
+
+Evaluating --> Success : value computed
+Evaluating --> Failure : exception caught
+
+state Success {
+    state "biased = True" as S1
+    state "value = result" as S2
+    S1 --> S2
+    
+    Success : is_success() = True
+    Success : is_failure() = False
+    Success : get() returns value
+}
+
+state Failure {
+    state "biased = False" as F1
+    state "value = Exception" as F2
+    F1 --> F2
+    
+    Failure : is_success() = False
+    Failure : is_failure() = True
+    Failure : get() raises TypeError
+    Failure : error() returns Exception
+}
+
+Success --> Success : map(func)\n[success path]
+Success --> Success : flat_map(func)\n[returns Success]
+Success --> Failure : flat_map(func)\n[returns Failure]
+
+Failure --> Failure : map(func)\n[short-circuit]
+Failure --> Failure : flat_map(func)\n[short-circuit]
+
+Failure --> Success : recover(err, value)\n[matches exception type]
+Failure --> Failure : recover(err, value)\n[doesn't match]
+
+Failure --> Success : recovers([errs], value)\n[matches any type]
+Failure --> Failure : recovers([errs], value)\n[doesn't match any]
+
+Success --> [*] : on_success(callback)\n[executes callback]
+Failure --> [*] : on_failure(callback)\n[executes callback]
+
+note right of Success
+    Success represents a 
+    successful computation
+    with a valid result
+end note
+
+note right of Failure
+    Failure represents a 
+    computation that threw
+    an exception
+end note
+
+note bottom of Evaluating
+    Try.of() eagerly evaluates
+    the function or value and
+    catches any exceptions
+end note
+
+@enduml
+

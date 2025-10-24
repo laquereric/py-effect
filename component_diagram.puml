@@ -1,0 +1,136 @@
+@startuml component_diagram
+
+title pyeffects - Component Diagram
+
+skinparam componentStyle rectangle
+
+package "pyeffects" {
+    
+    component "Monad.py" as Monad {
+        [Monad<A>]
+        [identity function]
+    }
+    
+    component "Option.py" as OptionMod {
+        [Option<A>]
+        [Some<A>]
+        [Empty<A>]
+        [empty singleton]
+    }
+    
+    component "Either.py" as EitherMod {
+        [Either<A>]
+        [Left<A>]
+        [Right<A>]
+    }
+    
+    component "Try.py" as TryMod {
+        [Try<A>]
+        [Success<A>]
+        [Failure<A>]
+    }
+    
+    component "Future.py" as FutureMod {
+        [Future<A>]
+    }
+    
+    component "__init__.py" as Init {
+        [Package metadata]
+        [Version info]
+    }
+    
+    component "__version__.py" as Version {
+        [__version__]
+    }
+}
+
+package "Python Standard Library" {
+    component "typing" {
+        [Generic]
+        [TypeVar]
+        [Callable]
+        [Union]
+        [List]
+        [Type]
+    }
+    
+    component "threading" {
+        [Thread]
+        [BoundedSemaphore]
+    }
+    
+    component "functools" {
+        [reduce]
+    }
+}
+
+' Dependencies from pyeffects modules to Monad
+OptionMod ..> Monad : imports
+EitherMod ..> Monad : imports
+TryMod ..> Monad : imports
+FutureMod ..> Monad : imports
+
+' Dependencies from Future to other modules
+FutureMod ..> OptionMod : imports (Some, empty)
+FutureMod ..> TryMod : imports (Try, Success, Failure)
+
+' Dependencies on standard library
+Monad ..> typing : uses
+OptionMod ..> typing : uses
+EitherMod ..> typing : uses
+TryMod ..> typing : uses
+FutureMod ..> typing : uses
+FutureMod ..> threading : uses
+FutureMod ..> functools : uses
+
+Init ..> Version : imports
+
+note right of Monad
+    Base abstraction providing
+    common monad operations:
+    - map()
+    - flat_map()
+    - get()
+    - get_or_else()
+    - or_else()
+end note
+
+note right of OptionMod
+    Handles optional values:
+    - Some: value present
+    - Empty: no value
+    Uses singleton pattern
+    for Empty instance
+end note
+
+note right of EitherMod
+    Represents disjoint union:
+    - Right: success/right value
+    - Left: error/left value
+    Right-biased operations
+end note
+
+note right of TryMod
+    Exception handling:
+    - Success: computation succeeded
+    - Failure: exception caught
+    Provides recovery methods
+end note
+
+note right of FutureMod
+    Asynchronous computation:
+    - Thread-based execution
+    - Callback support
+    - Wraps results in Try
+    - Thread-safe operations
+end note
+
+cloud "User Application" as App
+
+App --> OptionMod : uses
+App --> EitherMod : uses
+App --> TryMod : uses
+App --> FutureMod : uses
+
+@enduml
+

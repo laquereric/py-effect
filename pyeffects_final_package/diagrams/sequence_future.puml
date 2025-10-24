@@ -1,0 +1,158 @@
+@startuml future_sequence
+
+title Future Monad - Asynchronous Sequence Diagram
+
+actor User
+participant "Future" as F
+participant "WorkerThread" as WT
+participant "Try" as T
+participant "Success" as S
+participant "Subscriber" as Sub
+participant "SubscriberThread" as ST
+
+== Immediate Future Creation ==
+User -> F: Future.of(5)
+activate F
+F -> F: __init__(lambda cb: cb(Success(5)))
+activate F
+F -> T: Success(5)
+activate T
+T --> F
+deactivate T
+F -> F: _callback(Success(5))
+activate F
+F -> F: cache = Some(Success(5))
+F --> F
+deactivate F
+F --> F
+deactivate F
+F --> User: Future(Success(5))
+deactivate F
+
+== Asynchronous Future Creation ==
+User -> F: Future.run(expensive_func)
+activate F
+F -> F: __init__(lambda cb: _run_on_thread(func, cb))
+activate F
+F -> WT: Thread(target=_exec, args=[func, cb])
+activate WT
+note right of WT: Runs on separate thread
+F --> F: Future instance
+deactivate F
+F --> User: Future(None) [not done yet]
+deactivate F
+
+WT -> WT: try: data = func()
+activate WT
+WT -> T: Success(data)
+activate T
+T --> WT
+deactivate T
+WT -> F: cb(Success(data))
+activate F
+F -> F: _callback(Success(data))
+activate F
+F -> F: value = Success(data)
+F -> F: cache = Some(Success(data))
+F --> F
+deactivate F
+F --> WT
+deactivate F
+deactivate WT
+deactivate WT
+
+== Subscriber Registration (Before Completion) ==
+User -> F: future.on_complete(callback)
+activate F
+F -> F: semaphore.acquire()
+F -> F: cache.is_defined() == False
+F -> F: subscribers.append(callback)
+F -> F: semaphore.release()
+F --> User
+deactivate F
+
+note over F,WT: Future completes...
+
+F -> F: _callback(result)
+activate F
+F -> F: semaphore.acquire()
+F -> F: cache = Some(result)
+loop for each subscriber
+    F -> ST: Thread(target=sub, args=[result])
+    activate ST
+    ST -> Sub: callback(result)
+    activate Sub
+    Sub --> ST
+    deactivate Sub
+    deactivate ST
+end
+F -> F: semaphore.release()
+F --> F
+deactivate F
+
+== Subscriber Registration (After Completion) ==
+User -> F: future.on_complete(callback)
+activate F
+F -> F: semaphore.acquire()
+F -> F: cache.is_defined() == True
+F -> F: semaphore.release()
+F -> Sub: callback(cache.value)
+activate Sub
+Sub --> F
+deactivate Sub
+F --> User
+deactivate F
+
+== Map Operation ==
+User -> F: future.map(lambda v: v * 2)
+activate F
+F -> F: flat_map(wrapped)
+activate F
+F -> F: Future(lambda cb: self.on_complete(...))
+activate F
+note right of F: Creates new Future
+F --> F: new_future
+deactivate F
+F --> F
+deactivate F
+F --> User: new_future
+deactivate F
+
+note over F: When original future completes,\nnew future applies transformation
+
+== Error Handling ==
+User -> F: Future.run(failing_func)
+activate F
+F -> WT: Thread(target=_exec, args=[func, cb])
+activate WT
+WT -> WT: try: func()
+WT -> WT: except Exception as err
+WT -> T: Failure(err)
+activate T
+T --> WT
+deactivate T
+WT -> F: cb(Failure(err))
+activate F
+F -> F: _callback(Failure(err))
+activate F
+F -> F: value = Failure(err)
+F --> F
+deactivate F
+F --> WT
+deactivate F
+deactivate WT
+F --> User: Future(Failure(err))
+deactivate F
+
+User -> F: future.on_failure(error_handler)
+activate F
+F -> F: is_failure() == True
+F -> Sub: error_handler(error)
+activate Sub
+Sub --> F
+deactivate Sub
+F --> User
+deactivate F
+
+@enduml
+
